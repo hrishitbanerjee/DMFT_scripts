@@ -1,11 +1,15 @@
 from triqs_dft_tools.sumk_dft import *
-from pytriqs.gf import *
-from pytriqs.archive import HDFArchive
-from pytriqs.operators.util import *
+from triqs.gf import *
+from h5 import HDFArchive
+from triqs.operators.util import *
+from triqs.operators.util.U_matrix import *
+from triqs.operators.util.hamiltonians import *
 from triqs_cthyb import *
-import pytriqs.utility.mpi as mpi
-import os
-from triqs_dft_tools.converters.wien2k_converter import *
+#from triqs.plot.mpl_interface import *
+import sys, triqs.version as triqs_version
+import triqs.utility.mpi as mpi
+import numpy as np
+from triqs_dft_tools.converters.wien2k import *
 
 dft_filename = os.getcwd().rpartition('/')[2]
 Converter = Wien2kConverter(filename = dft_filename)
@@ -23,7 +27,7 @@ dc_type = 1                     # DC type: 0 FLL, 1 Held, 2 AMF
 use_blocks = True               # use bloc structure from DFT input
 prec_mu = 0.0001                # precision of chemical potential
 
-SK = SumkDFT(hdf_file=dft_filename+'.h5',use_dft_blocks=use_blocks)
+SK = SumkDFT(hdf_file=dft_filename+'.h5',use_dft_blocks=use_blocks, beta=beta)
 
 p = {}
 # solver
@@ -42,7 +46,7 @@ l = SK.corr_shells[0]['l']
 spin_names = ["up","down"]
 orb_names = [i for i in range(n_orb)]
 # Use GF structure determined by DFT blocks:
-gf_struct = [(block, indices) for block, indices in SK.gf_struct_solver[0].iteritems()]
+gf_struct = [(block, indices) for block, indices in SK.gf_struct_solver[0].items()]
 # Construct U matrix for density-density calculations:
 Umat, Upmat = U_matrix_kanamori(n_orb=n_orb, U_int=U, J_hund=J)
 
@@ -61,7 +65,7 @@ if mpi.is_master_node():
             if 'iterations' in ar:
                 previous_present = True
                 previous_runs = ar['iterations']
-                print "Start from previous run!"
+                print("Start from previous run!")
         else:
             f.create_group('dmft_output')
 
@@ -81,7 +85,7 @@ if previous_present:
     
 
 for iteration_number in range(1,loops+1):
-    if mpi.is_master_node(): print "Iteration = ", iteration_number
+    if mpi.is_master_node(): print("Iteration = ", iteration_number)
 
     SK.symm_deg_gf(S.Sigma_iw)                        # symmetrizing Sigma
     SK.set_Sigma([ S.Sigma_iw ])                            # put Sigma into the SumK class
@@ -148,4 +152,3 @@ if mpi.is_master_node():
   f=open(dft_filename+'.qdmft','a')
   f.write("%.16f\n"%correnerg)
   f.close()
-
